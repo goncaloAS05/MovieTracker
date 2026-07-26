@@ -1,0 +1,16 @@
+Week 1
+
+Schema + DB connection helper
+TMDB ingestion script (search a title, insert into titles)
+Route: search for a title → add to "want to watch"
+
+Week 2
+
+Routes: list watchlist, mark as watching/watched, add rating
+Templates for watchlist view, filter by status
+
+Week 3
+
+Dashboard: genres watched most, average rating by genre, watched-per-month trend
+Polish UI, maybe add poster images from TMDB
+Optional: simple "recommend something from your want-to-watch list" (random pick, weighted by genre preference)

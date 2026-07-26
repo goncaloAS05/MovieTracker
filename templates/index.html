@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Watchlist{% endblock %}
+{% block content %}
+    <h1>{{ current_status.replace('_', ' ').title() }}</h1>
+
+    {% if not rows %}
+        <p>Nothing here yet. <a href="/search">Search for something to add.</a></p>
+    {% endif %}
+
+    {% for row in rows %}
+        <div class="card">
+            {% if row.poster_url %}
+                <img src="{{ row.poster_url }}" alt="{{ row.name }}">
+            {% endif %}
+            <div class="info">
+                <strong>{{ row.name }}</strong>
+                <div class="meta">
+                    {{ row.type.title() }} · {{ row.release_year or "—" }} · {{ row.genre or "—" }}
+                    {% if row.rating %} · Rating: {{ row.rating }}/5{% endif %}
+                </div>
+            </div>
+            <div class="action-row">
+                <form class="inline" action="/watch-status/{{ row.watch_id }}/update" method="post">
+                    <select name="status">
+                        <option value="want_to_watch" {% if row.status == "want_to_watch" %}selected{% endif %}>Want to watch</option>
+                        <option value="watching" {% if row.status == "watching" %}selected{% endif %}>Watching</option>
+                        <option value="watched" {% if row.status == "watched" %}selected{% endif %}>Watched</option>
+                    </select>
+                    <label for="ep-{{ row.watch_id }}">Ep:</label>
+                    <input id="ep-{{ row.watch_id }}" type="number" name="episode" value="{{ row.episode_progress or '' }}" style="width: 4rem;">
+
+                    <!-- Rating input with label -->
+                    <label for="rating-{{ row.watch_id }}">★:</label>
+                    <input id="rating-{{ row.watch_id }}" type="number" name="rating" min="1" max="5" value="{{ row.rating or '' }}" style="width: 3.5rem;">
+                </form>
+
+                <form class="inline" action="/watch-status/{{ row.watch_id }}/delete" method="post" style="margin: 1;">
+                    <button type="submit" class="btn-danger">Remove</button>
+                    <button type="submit">Save</button>
+                </form>
+            </div>
+        </div>
+    {% endfor %}
+{% endblock %}

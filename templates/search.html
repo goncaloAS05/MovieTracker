@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Add a title{% endblock %}
+{% block content %}
+    <h1>Add a title</h1>
+    <form action="/search" method="get">
+        <input type="text" name="q" value="{{ query }}" placeholder="Search movies or series..." style="width:60%">
+        <button type="submit">Search</button>
+    </form>
+
+    {% if query and not results %}
+        <p>No results for "{{ query }}".</p>
+    {% endif %}
+
+    {% for r in results %}
+        <div class="card">
+            {% if r.poster_url %}
+                <img src="{{ r.poster_url }}" alt="{{ r.name }}">
+            {% endif %}
+            <div class="info">
+                <strong>{{ r.name }}</strong>
+                <div class="meta">{{ r.type.title() }} · {{ r.release_year or "—" }} · {{ r.genre or "—" }}</div>
+            </div>
+            <form class="inline" action="/add" method="post">
+                <input type="hidden" name="tmdb_id" value="{{ r.tmdb_id }}">
+                <input type="hidden" name="name" value="{{ r.name }}">
+                <input type="hidden" name="type" value="{{ r.type }}">
+                <input type="hidden" name="genre" value="{{ r.genre or '' }}">
+                <input type="hidden" name="release_year" value="{{ r.release_year or '' }}">
+                <input type="hidden" name="poster_url" value="{{ r.poster_url or '' }}">
+                <button type="submit">Add to watchlist</button>
+            </form>
+        </div>
+    {% endfor %}
+{% endblock %}
