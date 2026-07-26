@@ -32,11 +32,11 @@
                     <!-- Rating input with label -->
                     <label for="rating-{{ row.watch_id }}">★:</label>
                     <input id="rating-{{ row.watch_id }}" type="number" name="rating" min="1" max="5" value="{{ row.rating or '' }}" style="width: 3.5rem;">
+                    <button type="submit">Save</button>
                 </form>
 
                 <form class="inline" action="/watch-status/{{ row.watch_id }}/delete" method="post" style="margin: 1;">
                     <button type="submit" class="btn-danger">Remove</button>
-                    <button type="submit">Save</button>
                 </form>
             </div>
         </div>

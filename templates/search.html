@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Add a title{% endblock %}
+{% block title %}Search for all the movies/series{% endblock %}
 {% block content %}
-    <h1>Add a title</h1>
+    <h1>Search for all the movies and series</h1>
     <form action="/search" method="get">
         <input type="text" name="q" value="{{ query }}" placeholder="Search movies or series..." style="width:60%">
         <button type="submit">Search</button>
