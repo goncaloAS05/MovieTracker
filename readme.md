@@ -2,6 +2,7 @@
 
 A small FastAPI + SingleStore app for tracking movies/series you want to
 watch, are watching, or have watched. Titles are pulled from TMDB.
+It's still a work in progress, so it's a very basic setup.
 
 ## Setup
 
@@ -45,7 +46,6 @@ watch, are watching, or have watched. Titles are pulled from TMDB.
 ## Next steps / ideas to extend it
 
 - Add real auth (currently a single hardcoded `DEFAULT_USER_ID`)
-- Track per-episode progress for series
-- Add pagination once your list grows
+- Track per-episode/season progress for series
+- Add pagination once list of movies/series grows
 - Chart genre/rating trends with Chart.js on the dashboard
-- Compare rowstore vs columnstore performance once you have more data
