@@ -79,8 +79,9 @@ def home(request: Request, status: str = "want_to_watch"):
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT t.id, t.name, t.type, t.genre, t.release_year,
-               t.poster_url, ws.id AS watch_id, ws.status, ws.rating
+        SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
+               t.poster_url, ws.id AS watch_id, ws.status, ws.rating,
+               ws.episode_progress, ws.season_progress, ws.is_favourite
         FROM watch_status ws
         JOIN titles t ON t.id = ws.title_id
         WHERE ws.user_id = %s AND ws.status = %s
@@ -108,8 +109,9 @@ def home(request: Request, status: str = "watching"):
     cur = conn.cursor()
     cur.execute(
         """
-        SELECT t.id, t.name, t.type, t.genre, t.release_year,
-               t.poster_url, ws.id AS watch_id, ws.status, ws.rating, ws.episode_progress
+        SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
+               t.poster_url, ws.id AS watch_id, ws.status, ws.rating,
+               ws.episode_progress, ws.season_progress, ws.is_favourite
         FROM watch_status ws
         JOIN titles t ON t.id = ws.title_id
         WHERE ws.user_id = %s AND ws.status = %s
@@ -127,8 +129,16 @@ def home(request: Request, status: str = "watching"):
     )
 
 @app.post("/watch-status/{watch_id}/update")
-def update_status(request: Request, watch_id: int, status: str = Form(...), rating: str = Form(None), episode: str = Form(None)):
-    """Move a title between want_to_watch / watching / watched, set a rating, and track episode progress."""
+def update_status(
+    request: Request,
+    watch_id: int,
+    status: str = Form(...),
+    rating: str = Form(None),
+    episode: str = Form(None),
+    season: str = Form(None),
+    favourite: str = Form(None),
+):
+    """Move a title between want_to_watch / watching / watched, set a rating, and track episode/season progress + favourite."""
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
@@ -139,15 +149,17 @@ def update_status(request: Request, watch_id: int, status: str = Form(...), rati
     
     rating_value = int(rating) if rating else None
     episode_value = int(episode) if episode else 0
+    season_value = int(season) if season else None
+    is_favourite_value = favourite == "on"
     date_watched_clause = ", date_watched = NOW()" if status == "watched" else ""
     
     cur.execute(
         f"""
         UPDATE watch_status
-        SET status = %s, rating = %s, episode_progress = %s {date_watched_clause}
+        SET status = %s, rating = %s, episode_progress = %s, season_progress = %s, is_favourite = %s {date_watched_clause}
         WHERE id = %s AND user_id = %s
         """,
-        (status, rating_value, episode_value, watch_id, DEFAULT_USER_ID),
+        (status, rating_value, episode_value, season_value, is_favourite_value, watch_id, DEFAULT_USER_ID),
     )
     cur.close()
     conn.close()

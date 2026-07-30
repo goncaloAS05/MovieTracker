@@ -7,8 +7,8 @@ watch, are watching, or have watched. Titles are pulled from TMDB.
 
 1. Create and activate a virtual environment:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
+   python3 -m venv ~/venvs/singlestore-project
+   source ~/venvs/singlestore-project/bin/activate
    ```
 
 2. Install dependencies:
@@ -45,7 +45,6 @@ watch, are watching, or have watched. Titles are pulled from TMDB.
 ## Next steps / ideas to extend it
 
 - Add real auth (currently a single hardcoded `DEFAULT_USER_ID`)
-- Track per-episode progress for series
 - Add pagination once your list grows
 - Chart genre/rating trends with Chart.js on the dashboard
 - Compare rowstore vs columnstore performance once you have more data
