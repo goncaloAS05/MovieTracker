@@ -3,9 +3,27 @@
 {% block content %}
     <h1>{{ current_status.replace('_', ' ').title() }}</h1>
 
+    <!-- Media Type Filter Bar -->
+    <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem;">
+        <a href="?type=all" 
+           style="padding: 0.4rem 0.9rem; border-radius: 6px; text-decoration: none; font-size: 0.9rem; border: 1px solid #334155; {% if current_type == 'all' or not current_type %}background-color: #3b82f6; color: white;{% else %}background-color: #1e293b; color: #94a3b8;{% endif %}">
+            All
+        </a>
+        <a href="?type=movie" 
+           style="padding: 0.4rem 0.9rem; border-radius: 6px; text-decoration: none; font-size: 0.9rem; border: 1px solid #334155; {% if current_type == 'movie' %}background-color: #3b82f6; color: white;{% else %}background-color: #1e293b; color: #94a3b8;{% endif %}">
+            Movies
+        </a>
+        <a href="?type=series" 
+           style="padding: 0.4rem 0.9rem; border-radius: 6px; text-decoration: none; font-size: 0.9rem; border: 1px solid #334155; {% if current_type == 'series' %}background-color: #3b82f6; color: white;{% else %}background-color: #1e293b; color: #94a3b8;{% endif %}">
+            Series
+        </a>
+    </div>
+
     {% if not rows %}
         <p>Nothing here yet. <a href="/search">Search for something to add.</a></p>
     {% endif %}
+
+    <!-- Rest of your existing index.html loop code ... -->
 
     {% for row in rows %}
         <div class="card">

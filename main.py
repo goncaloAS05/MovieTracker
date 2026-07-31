@@ -86,16 +86,19 @@ def logout():
 
 # ---------- Watchlist views ----------
 
+# ---------- Watchlist views ----------
+
 @app.get("/")
-def home(request: Request, status: str = "want_to_watch"):
-    """Show titles filtered by status. Defaults to the want-to-watch list."""
+def home(request: Request, status: str = "want_to_watch", type: str = "all"):
+    """Show titles filtered by status and media type."""
     user = get_current_user(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
+
     conn = db.get_connection()
     cur = conn.cursor()
-    cur.execute(
-        """
+
+    query = """
         SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
                t.season_episode_counts, t.poster_url, ws.id AS watch_id,
                ws.status, ws.rating, ws.episode_progress, ws.season_progress,
@@ -103,31 +106,45 @@ def home(request: Request, status: str = "want_to_watch"):
         FROM watch_status ws
         JOIN titles t ON t.id = ws.title_id
         WHERE ws.user_id = %s AND ws.status = %s
-        ORDER BY ws.date_added DESC
-        """,
-        (DEFAULT_USER_ID, status),
-    )
+    """
+    params = [DEFAULT_USER_ID, status]
+
+    # Add media type filter if specified
+    if type in ("movie", "series"):
+        query += " AND t.type = %s"
+        params.append(type)
+
+    query += " ORDER BY ws.date_added DESC"
+
+    cur.execute(query, tuple(params))
     columns = [c[0] for c in cur.description]
     rows = [dict(zip(columns, row)) for row in cur.fetchall()]
     rows = _parse_season_data(rows)
     cur.close()
     conn.close()
+
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "rows": rows, "current_status": status},
+        {
+            "request": request,
+            "rows": rows,
+            "current_status": status,
+            "current_type": type,
+        },
     )
 
+
 @app.get("/watching")
-def home(request: Request, status: str = "watching"):
-    """Show titles filtered by status. Defaults to the want-to-watch list."""
+def watching_list(request: Request, status: str = "watching", type: str = "all"):
+    """Show titles in progress filtered by media type."""
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-    
+
     conn = db.get_connection()
     cur = conn.cursor()
-    cur.execute(
-        """
+
+    query = """
         SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
                t.season_episode_counts, t.poster_url, ws.id AS watch_id,
                ws.status, ws.rating, ws.episode_progress, ws.season_progress,
@@ -135,18 +152,30 @@ def home(request: Request, status: str = "watching"):
         FROM watch_status ws
         JOIN titles t ON t.id = ws.title_id
         WHERE ws.user_id = %s AND ws.status = %s
-        ORDER BY ws.date_added DESC
-        """,
-        (DEFAULT_USER_ID, status),
-    )
+    """
+    params = [DEFAULT_USER_ID, status]
+
+    if type in ("movie", "series"):
+        query += " AND t.type = %s"
+        params.append(type)
+
+    query += " ORDER BY ws.date_added DESC"
+
+    cur.execute(query, tuple(params))
     columns = [c[0] for c in cur.description]
     rows = [dict(zip(columns, row)) for row in cur.fetchall()]
     rows = _parse_season_data(rows)
     cur.close()
     conn.close()
+
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "rows": rows, "current_status": status},
+        {
+            "request": request,
+            "rows": rows,
+            "current_status": status,
+            "current_type": type,
+        },
     )
 
 @app.post("/watch-status/{watch_id}/update")
@@ -200,8 +229,8 @@ def delete_status(request: Request, watch_id: int):
         (watch_id, DEFAULT_USER_ID),
     )
     cur.execute(
-        "DELETE FROM titles WHERE id = %s AND user_id = %s",
-        (watch_id, DEFAULT_USER_ID),
+        "DELETE FROM titles WHERE id = %s",
+        (watch_id),
     )
     cur.close()
     conn.close()
