@@ -1,4 +1,5 @@
 import os
+import json
 import secrets
 from fastapi import FastAPI, Request, Form, status
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -26,6 +27,22 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 DEFAULT_USER_ID = int(os.getenv("DEFAULT_USER_ID", "1"))
+
+
+def _parse_season_data(rows):
+    """Turn the stored season_episode_counts JSON text into a dict per row,
+    plus a re-serialized copy for embedding in the template as a data attribute."""
+    for row in rows:
+        raw = row.get("season_episode_counts")
+        if isinstance(raw, str) and raw:
+            season_map = json.loads(raw)
+        elif isinstance(raw, dict):
+            season_map = raw
+        else:
+            season_map = {}
+        row["season_episode_counts"] = season_map
+        row["season_episode_counts_json"] = json.dumps(season_map)
+    return rows
 
 def get_current_user(request: Request):
     """Helper to check if the user has a valid login cookie."""
@@ -80,8 +97,9 @@ def home(request: Request, status: str = "want_to_watch"):
     cur.execute(
         """
         SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
-               t.poster_url, ws.id AS watch_id, ws.status, ws.rating,
-               ws.episode_progress, ws.season_progress, ws.is_favourite
+               t.season_episode_counts, t.poster_url, ws.id AS watch_id,
+               ws.status, ws.rating, ws.episode_progress, ws.season_progress,
+               ws.is_favourite
         FROM watch_status ws
         JOIN titles t ON t.id = ws.title_id
         WHERE ws.user_id = %s AND ws.status = %s
@@ -91,6 +109,7 @@ def home(request: Request, status: str = "want_to_watch"):
     )
     columns = [c[0] for c in cur.description]
     rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+    rows = _parse_season_data(rows)
     cur.close()
     conn.close()
     return templates.TemplateResponse(
@@ -110,8 +129,9 @@ def home(request: Request, status: str = "watching"):
     cur.execute(
         """
         SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
-               t.poster_url, ws.id AS watch_id, ws.status, ws.rating,
-               ws.episode_progress, ws.season_progress, ws.is_favourite
+               t.season_episode_counts, t.poster_url, ws.id AS watch_id,
+               ws.status, ws.rating, ws.episode_progress, ws.season_progress,
+               ws.is_favourite
         FROM watch_status ws
         JOIN titles t ON t.id = ws.title_id
         WHERE ws.user_id = %s AND ws.status = %s
@@ -121,6 +141,7 @@ def home(request: Request, status: str = "watching"):
     )
     columns = [c[0] for c in cur.description]
     rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+    rows = _parse_season_data(rows)
     cur.close()
     conn.close()
     return templates.TemplateResponse(
@@ -178,6 +199,10 @@ def delete_status(request: Request, watch_id: int):
         "DELETE FROM watch_status WHERE id = %s AND user_id = %s",
         (watch_id, DEFAULT_USER_ID),
     )
+    cur.execute(
+        "DELETE FROM titles WHERE id = %s AND user_id = %s",
+        (watch_id, DEFAULT_USER_ID),
+    )
     cur.close()
     conn.close()
     return RedirectResponse("/", status_code=303)
@@ -223,16 +248,20 @@ def add_title(
     else:
         media_type = "movie" if type == "movie" else "tv"
         details = tmdb.get_details(tmdb_id, media_type)
+        season_episode_counts = details.get("season_episode_counts") or {}
         cur.execute(
             """
             INSERT INTO titles (tmdb_id, name, type, genre, release_year,
-                                 total_runtime_minutes, poster_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                 total_runtime_minutes, total_seasons,
+                                 season_episode_counts, poster_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 tmdb_id, name, type, genre,
                 int(release_year) if release_year else None,
                 details.get("total_runtime_minutes"),
+                details.get("total_seasons"),
+                json.dumps(season_episode_counts) if season_episode_counts else None,
                 poster_url,
             ),
         )

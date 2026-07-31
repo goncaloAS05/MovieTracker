@@ -58,18 +58,26 @@ def search(query: str, media_type: str = "multi") -> list[dict]:
 
 
 def get_details(tmdb_id: int, media_type: str) -> dict:
-    """Fetch runtime (and season count, for series) info for a specific title
-    (not included in search results)."""
+    """Fetch runtime, season count, and per-season episode counts for a
+    specific title (not included in search results)."""
     path = f"/movie/{tmdb_id}" if media_type == "movie" else f"/tv/{tmdb_id}"
     data = _get(path)
     if media_type == "movie":
         runtime = data.get("runtime")
-        total_seasons = None
+        season_episode_counts = {}
     else:
         episode_runtimes = data.get("runtime", [])
         runtime = episode_runtimes[0] if episode_runtimes else None
-        total_seasons = data.get("number_of_seasons")
-    return {"runtime": runtime, "total_seasons": total_seasons}
+        season_episode_counts = {
+            str(s["season_number"]): s["episode_count"]
+            for s in data.get("seasons", [])
+            if s.get("season_number", 0) >= 1  # skip "Specials" (season 0)
+        }
+    return {
+        "runtime": runtime,
+        "total_seasons": len(season_episode_counts) or None,
+        "season_episode_counts": season_episode_counts,
+    }
 
 
 def _extract_year(date_str: str | None) -> int | None:

@@ -50,6 +50,8 @@ def create_tables():
             genre VARCHAR(255),
             release_year INT,
             total_runtime_minutes INT,
+            total_seasons INT,
+            season_episode_counts TEXT,
             poster_url TEXT
         )
         """
@@ -64,6 +66,9 @@ def create_tables():
             title_id BIGINT NOT NULL,
             status ENUM('want_to_watch','watching','watched') NOT NULL DEFAULT 'want_to_watch',
             rating INT,
+            episode_progress INT,
+            season_progress INT,
+            is_favourite BOOL NOT NULL DEFAULT FALSE,
             date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             date_watched TIMESTAMP NULL
         )

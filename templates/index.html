@@ -27,20 +27,26 @@
                         <option value="watched" {% if row.status == "watched" %}selected{% endif %}>Watched</option>
                     </select>
                     {% if row.type != "movie" %}
-                    <label for="season-{{ row.watch_id }}">Season:</label>
-                    {% if row.total_seasons %}
-                        <select id="season-{{ row.watch_id }}" name="season">
-                            <option value="">—</option>
-                            {% for s in range(1, row.total_seasons + 1) %}
-                                <option value="{{ s }}" {% if row.season_progress == s %}selected{% endif %}>{{ s }}</option>
-                            {% endfor %}
-                        </select>
-                    {% else %}
-                        <input id="season-{{ row.watch_id }}" type="number" name="season" min="1" value="{{ row.season_progress or '' }}" style="width: 3.5rem;">
-                    {% endif %}
+                        {% if row.season_episode_counts %}
+                            <label for="season-{{ row.watch_id }}">Season:</label>
+                            <select id="season-{{ row.watch_id }}" name="season" class="season-select" data-episodes='{{ row.season_episode_counts_json }}'>
+                                <option value="">—</option>
+                                {% for season_num in row.season_episode_counts.keys() %}
+                                    <option value="{{ season_num }}" {% if row.season_progress == season_num|int %}selected{% endif %}>Season {{ season_num }}</option>
+                                {% endfor %}
+                            </select>
 
-                    <label for="ep-{{ row.watch_id }}">Ep:</label>
-                    <input id="ep-{{ row.watch_id }}" type="number" name="episode" value="{{ row.episode_progress or '' }}" style="width: 4rem;">
+                            <label for="ep-{{ row.watch_id }}">Ep:</label>
+                            <select id="ep-{{ row.watch_id }}" name="episode" class="episode-select" data-current="{{ row.episode_progress or '' }}">
+                                <option value="">—</option>
+                            </select>
+                        {% else %}
+                            <!-- No TMDB season data stored for this title (e.g. added before this feature) -->
+                            <label for="season-{{ row.watch_id }}">Season:</label>
+                            <input id="season-{{ row.watch_id }}" type="number" name="season" min="1" value="{{ row.season_progress or '' }}" style="width: 3.5rem;">
+                            <label for="ep-{{ row.watch_id }}">Ep:</label>
+                            <input id="ep-{{ row.watch_id }}" type="number" name="episode" value="{{ row.episode_progress or '' }}" style="width: 4rem;">
+                        {% endif %}
                     {% endif %}
 
                     {% if row.status == "watching" %}
@@ -51,7 +57,7 @@
                     {% endif %}
 
                     <!-- Rating input with label -->
-                    <label for="rating-{{ row.watch_id }}"> rating:</label>
+                    <label for="rating-{{ row.watch_id }}">★:</label>
                     <input id="rating-{{ row.watch_id }}" type="number" name="rating" min="1" max="5" value="{{ row.rating or '' }}" style="width: 3.5rem;">
                     <button type="submit">Save</button>
                 </form>
@@ -62,4 +68,40 @@
             </div>
         </div>
     {% endfor %}
+
+    <script>
+        document.querySelectorAll('.season-select').forEach(function (seasonSelect) {
+            var episodeSelect = seasonSelect.closest('form').querySelector('.episode-select');
+            if (!episodeSelect) return;
+
+            var episodeCounts = JSON.parse(seasonSelect.dataset.episodes || '{}');
+            var currentEpisode = episodeSelect.dataset.current || '';
+
+            function populateEpisodes(seasonNum) {
+                var previousValue = episodeSelect.value || currentEpisode;
+                episodeSelect.innerHTML = '';
+                var placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = '—';
+                episodeSelect.appendChild(placeholder);
+
+                var count = episodeCounts[seasonNum];
+                if (!count) return;
+                for (var i = 1; i <= count; i++) {
+                    var opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = i;
+                    if (String(i) === String(previousValue)) opt.selected = true;
+                    episodeSelect.appendChild(opt);
+                }
+            }
+
+            populateEpisodes(seasonSelect.value);
+
+            seasonSelect.addEventListener('change', function () {
+                currentEpisode = '';
+                populateEpisodes(seasonSelect.value);
+            });
+        });
+    </script>
 {% endblock %}
