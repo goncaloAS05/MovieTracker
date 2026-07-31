@@ -86,8 +86,6 @@ def logout():
 
 # ---------- Watchlist views ----------
 
-# ---------- Watchlist views ----------
-
 @app.get("/")
 def home(request: Request, status: str = "want_to_watch", type: str = "all"):
     """Show titles filtered by status and media type."""
@@ -201,13 +199,13 @@ def update_status(
     episode_value = int(episode) if episode else 0
     season_value = int(season) if season else None
     is_favourite_value = favourite == "on"
-    date_watched_clause = ", date_watched = NOW()" if status == "watched" else ""
+    date_watched_clause = ", date_watched = NOW()" if status != "want_to_watch" else ""
     
     cur.execute(
         f"""
         UPDATE watch_status
         SET status = %s, rating = %s, episode_progress = %s, season_progress = %s, is_favourite = %s {date_watched_clause}
-        WHERE id = %s AND user_id = %s
+        WHERE id = %s AND user_id = %s 
         """,
         (status, rating_value, episode_value, season_value, is_favourite_value, watch_id, DEFAULT_USER_ID),
     )
@@ -312,7 +310,7 @@ def add_title(
 # ---------- Dashboard ----------
 
 @app.get("/dashboard")
-def dashboard(request: Request):
+def dashboard(request: Request, type: str = "all"):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
@@ -336,7 +334,7 @@ def dashboard(request: Request):
         """
         SELECT DATE_FORMAT(date_watched, '%%Y-%%m') AS month, COUNT(*) AS count
         FROM watch_status
-        WHERE user_id = %s AND status = 'watched' AND date_watched IS NOT NULL
+        WHERE user_id = %s AND status != 'want_to_watch' AND date_watched IS NOT NULL
         GROUP BY month
         ORDER BY month
         """,
@@ -344,9 +342,30 @@ def dashboard(request: Request):
     )
     monthly_stats = cur.fetchall()
 
+    query = """
+        SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
+            t.season_episode_counts, t.poster_url, ws.id AS watch_id,
+            ws.status, ws.rating, ws.episode_progress, ws.season_progress,
+            ws.is_favourite
+        FROM watch_status ws
+        JOIN titles t ON t.id = ws.title_id
+        WHERE ws.user_id = %s AND ws.is_favourite = TRUE
+    """
+    params = [DEFAULT_USER_ID]
+
+
+    if type in ("movie", "series"):
+            query += " AND t.type = %s"
+            params.append(type)
+
+    query += " ORDER BY ws.date_added DESC"
+    cur.execute(query, tuple(params))
+    columns = [c[0] for c in cur.description]
+    rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+    rows = _parse_season_data(rows)
     cur.close()
     conn.close()
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "genre_stats": genre_stats, "monthly_stats": monthly_stats},
+        {"request": request, "genre_stats": genre_stats, "monthly_stats": monthly_stats, "favourite_titles": rows},
     )
