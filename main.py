@@ -128,6 +128,7 @@ def home(request: Request, status: str = "want_to_watch", type: str = "all"):
             "rows": rows,
             "current_status": status,
             "current_type": type,
+            "page_type": "home",
         },
     )
 
@@ -173,13 +174,15 @@ def watching_list(request: Request, status: str = "watching", type: str = "all")
             "rows": rows,
             "current_status": status,
             "current_type": type,
+            "page_type": "watching",
         },
     )
 
-@app.post("/watch-status/{watch_id}/update")
+@app.post("/watch-status/{watch_id}/update/{type}")
 def update_status(
     request: Request,
     watch_id: int,
+    type: str,
     status: str = Form(...),
     rating: str = Form(None),
     episode: str = Form(None),
@@ -211,11 +214,14 @@ def update_status(
     )
     cur.close()
     conn.close()
-    return RedirectResponse("/watching", status_code=303)
+    if type == "watching":
+        return RedirectResponse("/watching", status_code=303)
+    
+    return RedirectResponse("/", status_code=303)
 
 
-@app.post("/watch-status/{watch_id}/delete")
-def delete_status(request: Request, watch_id: int):
+@app.post("/watch-status/{watch_id}/delete/{type}")
+def delete_status(request: Request, watch_id: int, type: str):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
@@ -232,6 +238,8 @@ def delete_status(request: Request, watch_id: int):
     )
     cur.close()
     conn.close()
+    if type == "watching":
+        return RedirectResponse("/watching", status_code=303)
     return RedirectResponse("/", status_code=303)
 
 
@@ -310,25 +318,53 @@ def add_title(
 # ---------- Dashboard ----------
 
 @app.get("/dashboard")
-def dashboard(request: Request, type: str = "all"):
+def dashboard(request: Request, fav_type: str = "all", rest_type: str = "all"):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
     conn = db.get_connection()
     cur = conn.cursor()
 
+    # 1. Genre Statistics (Now including media type)
     cur.execute(
         """
-        SELECT t.genre, COUNT(*) AS watched_count, AVG(ws.rating) AS avg_rating
+        SELECT t.genre, ws.rating, t.type
         FROM watch_status ws
         JOIN titles t ON t.id = ws.title_id
         WHERE ws.user_id = %s AND ws.status = 'watched' AND t.genre IS NOT NULL
-        GROUP BY t.genre
-        ORDER BY watched_count DESC
         """,
         (DEFAULT_USER_ID,),
     )
-    genre_stats = cur.fetchall()
+    raw_watched = cur.fetchall()
+
+    # Dictionary to keep track of counts and ratings per genre AND type
+    genre_tracker = {}
+    
+    # Notice we unpack 3 variables now: raw_genre_string, rating, media_type
+    for raw_genre_string, rating, media_type in raw_watched:
+        individual_genres = [g.strip() for g in raw_genre_string.split(",") if g.strip()]
+        
+        for genre in individual_genres:
+            # We use a tuple of (genre, media_type) as our unique dictionary key
+            tracker_key = (genre, media_type)
+            
+            if tracker_key not in genre_tracker:
+                genre_tracker[tracker_key] = {"count": 0, "rating_sum": 0, "rating_count": 0}
+            
+            genre_tracker[tracker_key]["count"] += 1
+            if rating is not None:
+                genre_tracker[tracker_key]["rating_sum"] += rating
+                genre_tracker[tracker_key]["rating_count"] += 1
+
+    # Convert the dictionary back into a list for the HTML template
+    genre_stats = []
+    for (genre, media_type), data in genre_tracker.items():
+        avg_rating = (data["rating_sum"] / data["rating_count"]) if data["rating_count"] > 0 else None
+        # We append the media_type.title() so "movie" becomes "Movie"
+        genre_stats.append((genre, media_type.title(), data["count"], avg_rating))
+    
+    # Sort the list by the highest watch count (the 3rd item in the tuple at index 2)
+    genre_stats.sort(key=lambda x: x[2], reverse=True)
 
     cur.execute(
         """
@@ -342,30 +378,61 @@ def dashboard(request: Request, type: str = "all"):
     )
     monthly_stats = cur.fetchall()
 
-    query = """
+    # --- Fetch Favourite Titles ---
+    fav_query = """
         SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
-            t.season_episode_counts, t.poster_url, ws.id AS watch_id,
-            ws.status, ws.rating, ws.episode_progress, ws.season_progress,
-            ws.is_favourite
+               t.season_episode_counts, t.poster_url, ws.id AS watch_id,
+               ws.status, ws.rating, ws.episode_progress, ws.season_progress,
+               ws.is_favourite
         FROM watch_status ws
         JOIN titles t ON t.id = ws.title_id
         WHERE ws.user_id = %s AND ws.is_favourite = TRUE
     """
-    params = [DEFAULT_USER_ID]
-
-
-    if type in ("movie", "series"):
-            query += " AND t.type = %s"
-            params.append(type)
-
-    query += " ORDER BY ws.date_added DESC"
-    cur.execute(query, tuple(params))
+    fav_params = [DEFAULT_USER_ID]
+    
+    if fav_type in ("movie", "series"):
+        fav_query += " AND t.type = %s"
+        fav_params.append(fav_type)
+        
+    fav_query += " ORDER BY ws.date_added DESC"
+    
+    cur.execute(fav_query, tuple(fav_params))
     columns = [c[0] for c in cur.description]
-    rows = [dict(zip(columns, row)) for row in cur.fetchall()]
-    rows = _parse_season_data(rows)
+    favourite_rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+    favourite_rows = _parse_season_data(favourite_rows)
+
+    rest_query = """
+        SELECT t.id, t.name, t.type, t.genre, t.release_year, t.total_seasons,
+               t.season_episode_counts, t.poster_url, ws.id AS watch_id,
+               ws.status, ws.rating, ws.episode_progress, ws.season_progress,
+               ws.is_favourite
+        FROM watch_status ws
+        JOIN titles t ON t.id = ws.title_id
+        WHERE ws.user_id = %s AND ws.status = 'watched' AND ws.is_favourite = FALSE
+    """
+    rest_params = [DEFAULT_USER_ID]
+    
+    if rest_type in ("movie", "series"):
+        rest_query += " AND t.type = %s"
+        rest_params.append(rest_type)
+        
+    rest_query += " ORDER BY ws.date_added DESC"
+    
+    cur.execute(rest_query, tuple(rest_params))
+    columns = [c[0] for c in cur.description]
+    rest_rows = [dict(zip(columns, row)) for row in cur.fetchall()]
+    rest_rows = _parse_season_data(rest_rows)
     cur.close()
     conn.close()
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "genre_stats": genre_stats, "monthly_stats": monthly_stats, "favourite_titles": rows},
+        {
+            "request": request, 
+            "genre_stats": genre_stats, 
+            "monthly_stats": monthly_stats, 
+            "favourite_titles": favourite_rows,
+            "rest_titles": rest_rows,
+            "current_fav_type": fav_type,
+            "current_rest_type": rest_type
+        },
     )

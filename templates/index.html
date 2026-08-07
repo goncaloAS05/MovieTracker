@@ -23,69 +23,70 @@
         <p>Nothing here yet. <a href="/search">Search for something to add.</a></p>
     {% endif %}
 
-    <!-- Rest of your existing index.html loop code ... -->
+    <div class="grid-container">
+    
+        {% for row in rows %}
+            <div class="card">
+                {% if row.poster_url %}
+                    <img src="{{ row.poster_url }}" alt="{{ row.name }}">
+                {% endif %}
+                <div class="info">
+                    <strong>{{ row.name }}</strong>
+                    <div class="meta">
+                        {{ row.type.title() }} · {{ row.release_year or "—" }} · {{ row.genre or "—" }}
+                        {% if row.rating %} · Rating: {{ row.rating }}/5{% endif %}
+                    </div>
+                </div>
+                <div class="action-row">
+                    <form class="inline" action="/watch-status/{{ row.watch_id }}/update/{{ page_type }}" method="post">
+                        <select name="status">
+                            <option value="want_to_watch" {% if row.status == "want_to_watch" %}selected{% endif %}>Want to watch</option>
+                            <option value="watching" {% if row.status == "watching" %}selected{% endif %}>Watching</option>
+                            <option value="watched" {% if row.status == "watched" %}selected{% endif %}>Watched</option>
+                        </select>
+                        {% if row.type != "movie" %}
+                            {% if row.season_episode_counts %}
+                                <label for="season-{{ row.watch_id }}">Season:</label>
+                                <select id="season-{{ row.watch_id }}" name="season" class="season-select" data-episodes='{{ row.season_episode_counts_json }}'>
+                                    <option value="">—</option>
+                                    {% for season_num in row.season_episode_counts.keys() %}
+                                        <option value="{{ season_num }}" {% if row.season_progress == season_num|int %}selected{% endif %}>Season {{ season_num }}</option>
+                                    {% endfor %}
+                                </select>
 
-    {% for row in rows %}
-        <div class="card">
-            {% if row.poster_url %}
-                <img src="{{ row.poster_url }}" alt="{{ row.name }}">
-            {% endif %}
-            <div class="info">
-                <strong>{{ row.name }}</strong>
-                <div class="meta">
-                    {{ row.type.title() }} · {{ row.release_year or "—" }} · {{ row.genre or "—" }}
-                    {% if row.rating %} · Rating: {{ row.rating }}/5{% endif %}
+                                <label for="ep-{{ row.watch_id }}">Ep:</label>
+                                <select id="ep-{{ row.watch_id }}" name="episode" class="episode-select" data-current="{{ row.episode_progress or '' }}">
+                                    <option value="">—</option>
+                                </select>
+                            {% else %}
+                                <!-- No TMDB season data stored for this title (e.g. added before this feature) -->
+                                <label for="season-{{ row.watch_id }}">Season:</label>
+                                <input id="season-{{ row.watch_id }}" type="number" name="season" min="1" value="{{ row.season_progress or '' }}" style="width: 3.5rem;">
+                                <label for="ep-{{ row.watch_id }}">Ep:</label>
+                                <input id="ep-{{ row.watch_id }}" type="number" name="episode" value="{{ row.episode_progress or '' }}" style="width: 4rem;">
+                            {% endif %}
+                        {% endif %}
+
+                        {% if row.status == "watching" %}
+                        <label for="fav-{{ row.watch_id }}">
+                            <input id="fav-{{ row.watch_id }}" type="checkbox" name="favourite" {% if row.is_favourite %}checked{% endif %}>
+                            Favourite
+                        </label>
+                        {% endif %}
+
+                        <!-- Rating input with label -->
+                        <label for="rating-{{ row.watch_id }}">★:</label>
+                        <input id="rating-{{ row.watch_id }}" type="number" name="rating" min="1" max="5" value="{{ row.rating or '' }}" style="width: 3.5rem;">
+                        <button type="submit">Save</button>
+                    </form>
+
+                    <form class="inline" action="/watch-status/{{ row.watch_id }}/delete/{{ page_type }}" method="post" style="margin: 1;">
+                        <button type="submit" class="btn-danger">Remove</button>
+                    </form>
                 </div>
             </div>
-            <div class="action-row">
-                <form class="inline" action="/watch-status/{{ row.watch_id }}/update" method="post">
-                    <select name="status">
-                        <option value="want_to_watch" {% if row.status == "want_to_watch" %}selected{% endif %}>Want to watch</option>
-                        <option value="watching" {% if row.status == "watching" %}selected{% endif %}>Watching</option>
-                        <option value="watched" {% if row.status == "watched" %}selected{% endif %}>Watched</option>
-                    </select>
-                    {% if row.type != "movie" %}
-                        {% if row.season_episode_counts %}
-                            <label for="season-{{ row.watch_id }}">Season:</label>
-                            <select id="season-{{ row.watch_id }}" name="season" class="season-select" data-episodes='{{ row.season_episode_counts_json }}'>
-                                <option value="">—</option>
-                                {% for season_num in row.season_episode_counts.keys() %}
-                                    <option value="{{ season_num }}" {% if row.season_progress == season_num|int %}selected{% endif %}>Season {{ season_num }}</option>
-                                {% endfor %}
-                            </select>
-
-                            <label for="ep-{{ row.watch_id }}">Ep:</label>
-                            <select id="ep-{{ row.watch_id }}" name="episode" class="episode-select" data-current="{{ row.episode_progress or '' }}">
-                                <option value="">—</option>
-                            </select>
-                        {% else %}
-                            <!-- No TMDB season data stored for this title (e.g. added before this feature) -->
-                            <label for="season-{{ row.watch_id }}">Season:</label>
-                            <input id="season-{{ row.watch_id }}" type="number" name="season" min="1" value="{{ row.season_progress or '' }}" style="width: 3.5rem;">
-                            <label for="ep-{{ row.watch_id }}">Ep:</label>
-                            <input id="ep-{{ row.watch_id }}" type="number" name="episode" value="{{ row.episode_progress or '' }}" style="width: 4rem;">
-                        {% endif %}
-                    {% endif %}
-
-                    {% if row.status == "watching" %}
-                    <label for="fav-{{ row.watch_id }}">
-                        <input id="fav-{{ row.watch_id }}" type="checkbox" name="favourite" {% if row.is_favourite %}checked{% endif %}>
-                        Favourite
-                    </label>
-                    {% endif %}
-
-                    <!-- Rating input with label -->
-                    <label for="rating-{{ row.watch_id }}">★:</label>
-                    <input id="rating-{{ row.watch_id }}" type="number" name="rating" min="1" max="5" value="{{ row.rating or '' }}" style="width: 3.5rem;">
-                    <button type="submit">Save</button>
-                </form>
-
-                <form class="inline" action="/watch-status/{{ row.watch_id }}/delete" method="post" style="margin: 1;">
-                    <button type="submit" class="btn-danger">Remove</button>
-                </form>
-            </div>
-        </div>
-    {% endfor %}
+        {% endfor %}
+    </div>
 
     <script>
         document.querySelectorAll('.season-select').forEach(function (seasonSelect) {
